@@ -6,13 +6,13 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"net"
 	"os"
 
-	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
+	"github.com/nodephell/yaml"
 )
 
 type jsonNumberT string
@@ -564,12 +564,12 @@ func (ft *failingMarshaler) MarshalYAML() (interface{}, error) {
 	return nil, failingErr
 }
 
-func (s *S) TestMarshalerError(c *C) {
+func TestMarshalerError(t *testing.T) {
 	_, err := yaml.Marshal(&failingMarshaler{})
-	c.Assert(err, Equals, failingErr)
+	assert(t, failingErr, err)
 }
 
-func (s *S) TestSortedOutput(c *C) {
+func TestSortedOutput(t *testing.T) {
 	order := []interface{}{
 		false,
 		true,
@@ -620,7 +620,7 @@ func (s *S) TestSortedOutput(c *C) {
 		m[k] = 1
 	}
 	data, err := yaml.Marshal(m)
-	c.Assert(err, IsNil)
+	assert(t, nil, err)
 	out := "\n" + string(data)
 	last := 0
 	for i, k := range order {
@@ -632,10 +632,10 @@ func (s *S) TestSortedOutput(c *C) {
 		}
 		index := strings.Index(out, "\n"+repr+":")
 		if index == -1 {
-			c.Fatalf("%#v is not in the output: %#v", k, out)
+			t.Fatalf("%#v is not in the output: %#v", k, out)
 		}
 		if index < last {
-			c.Fatalf("%#v was generated before %#v: %q", k, order[i-1], out)
+			t.Fatalf("%#v was generated before %#v: %q", k, order[i-1], out)
 		}
 		last = index
 	}
