@@ -6,10 +6,10 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"testing"
 	"time"
 
-	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
+	"github.com/nodephell/yaml"
 )
 
 var unmarshalIntTest = 123
@@ -747,47 +747,46 @@ type inlineC struct {
 	C int
 }
 
-func (s *S) TestUnmarshal(c *C) {
+func TestUnmarshal(t *testing.T) {
 	for i, item := range unmarshalTests {
 		c.Logf("test %d: %q", i, item.data)
 		t := reflect.ValueOf(item.value).Type()
 		value := reflect.New(t)
 		err := yaml.Unmarshal([]byte(item.data), value.Interface())
 		if _, ok := err.(*yaml.TypeError); !ok {
-			c.Assert(err, IsNil)
+			assert(err, IsNil)
 		}
 		c.Assert(value.Elem().Interface(), DeepEquals, item.value, Commentf("error: %v", err))
 	}
 }
 
 // TODO(v3): This test should also work when unmarshaling onto an interface{}.
-func (s *S) TestUnmarshalFullTimestamp(c *C) {
+func TestUnmarshalFullTimestamp(t *testing.T) {
 	// Full timestamp in same format as encoded. This is confirmed to be
 	// properly decoded by Python as a timestamp as well.
 	var str = "2015-02-24T18:19:39.123456789-03:00"
-	var t time.Time
+	var timestamp time.Time
 	err := yaml.Unmarshal([]byte(str), &t)
-	c.Assert(err, IsNil)
-	c.Assert(t, Equals, time.Date(2015, 2, 24, 18, 19, 39, 123456789, t.Location()))
-	c.Assert(t.In(time.UTC), Equals, time.Date(2015, 2, 24, 21, 19, 39, 123456789, time.UTC))
+	assert(t, nil, err)
+	assert(t, time.Date(2015, 2, 24, 18, 19, 39, 123456789, timestamp.Location()), timestamp)
+	assert(t, time.Date(2015, 2, 24, 21, 19, 39, 123456789, time.UTC), timestamp.In(time.UTC))
 }
 
-func (s *S) TestDecoderSingleDocument(c *C) {
+func (s *S) TestDecoderSingleDocument(t *testing.T) {
 	// Test that Decoder.Decode works as expected on
 	// all the unmarshal tests.
 	for i, item := range unmarshalTests {
-		c.Logf("test %d: %q", i, item.data)
+		t.Logf("test %d: %q", i, item.data)
 		if item.data == "" {
 			// Behaviour differs when there's no YAML.
 			continue
 		}
-		t := reflect.ValueOf(item.value).Type()
-		value := reflect.New(t)
+		value := reflect.New(reflect.ValueOf(item.value).Type())
 		err := yaml.NewDecoder(strings.NewReader(item.data)).Decode(value.Interface())
 		if _, ok := err.(*yaml.TypeError); !ok {
-			c.Assert(err, IsNil)
+			assert(t, nil, err)
 		}
-		c.Assert(value.Elem().Interface(), DeepEquals, item.value)
+		assert(t, item.value, value.Elem().Interface())
 	}
 }
 
@@ -815,9 +814,9 @@ var decoderTests = []struct {
 	},
 }}
 
-func (s *S) TestDecoder(c *C) {
+func (s *S) TestDecoder(t *testing.T) {
 	for i, item := range decoderTests {
-		c.Logf("test %d: %q", i, item.data)
+		t.Logf("test %d: %q", i, item.data)
 		var values []interface{}
 		dec := yaml.NewDecoder(strings.NewReader(item.data))
 		for {
@@ -826,10 +825,10 @@ func (s *S) TestDecoder(c *C) {
 			if err == io.EOF {
 				break
 			}
-			c.Assert(err, IsNil)
+			assert(t, nil, err)
 			values = append(values, value)
 		}
-		c.Assert(values, DeepEquals, item.values)
+		assert(t, item.values, values)
 	}
 }
 
@@ -839,16 +838,16 @@ func (errReader) Read([]byte) (int, error) {
 	return 0, errors.New("some read error")
 }
 
-func (s *S) TestDecoderReadError(c *C) {
+func TestDecoderReadError(t *testing.T) {
 	err := yaml.NewDecoder(errReader{}).Decode(&struct{}{})
-	c.Assert(err, ErrorMatches, `yaml: input error: some read error`)
+	assert(t, `yaml: input error: some read error`, err.Error())
 }
 
-func (s *S) TestUnmarshalNaN(c *C) {
+func TestUnmarshalNaN(t *testing.T) {
 	value := map[string]interface{}{}
 	err := yaml.Unmarshal([]byte("notanum: .NaN"), &value)
-	c.Assert(err, IsNil)
-	c.Assert(math.IsNaN(value["notanum"].(float64)), Equals, true)
+	assert(t, nil, err)
+	assert(t, true, math.IsNaN(value["notanum"].(float64)))
 }
 
 var unmarshalErrorTests = []struct {
@@ -870,24 +869,24 @@ var unmarshalErrorTests = []struct {
 	{"a:\n  1:\nb\n  2:", ".*could not find expected ':'"},
 	{
 		"a: &a [00,00,00,00,00,00,00,00,00]\n" +
-		"b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\n" +
-		"c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\n" +
-		"d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\n" +
-		"e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\n" +
-		"f: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\n" +
-		"g: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\n" +
-		"h: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\n" +
-		"i: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n",
+			"b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\n" +
+			"c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\n" +
+			"d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\n" +
+			"e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\n" +
+			"f: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\n" +
+			"g: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\n" +
+			"h: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\n" +
+			"i: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n",
 		"yaml: document contains excessive aliasing",
 	},
 }
 
-func (s *S) TestUnmarshalErrors(c *C) {
+func (s *S) TestUnmarshalErrors(t *testing.T) {
 	for i, item := range unmarshalErrorTests {
-		c.Logf("test %d: %q", i, item.data)
+		t.Logf("test %d: %q", i, item.data)
 		var value interface{}
 		err := yaml.Unmarshal([]byte(item.data), &value)
-		c.Assert(err, ErrorMatches, item.error, Commentf("Partial unmarshal: %#v", value))
+		t.Assert(err, ErrorMatches, item.error, Commentf("Partial unmarshal: %#v", value))
 
 		if strings.Contains(item.data, ":") {
 			// Repeat test with typed value.
@@ -898,11 +897,11 @@ func (s *S) TestUnmarshalErrors(c *C) {
 	}
 }
 
-func (s *S) TestDecoderErrors(c *C) {
+func (s *S) TestDecoderErrors(t *testing.T) {
 	for _, item := range unmarshalErrorTests {
 		var value interface{}
 		err := yaml.NewDecoder(strings.NewReader(item.data)).Decode(&value)
-		c.Assert(err, ErrorMatches, item.error, Commentf("Partial unmarshal: %#v", value))
+		assert(t, item.error, err)
 	}
 }
 
@@ -946,7 +945,7 @@ type unmarshalerValue struct {
 	Field unmarshalerType "_"
 }
 
-func (s *S) TestUnmarshalerPointerField(c *C) {
+func (s *S) TestUnmarshalerPointerField(t *testing.T) {
 	for _, item := range unmarshalerTests {
 		obj := &unmarshalerPointer{}
 		err := yaml.Unmarshal([]byte(item.data), obj)
